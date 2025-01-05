@@ -1,93 +1,49 @@
 package org.example;
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.example.models.PokemonData;
+import org.example.models.StandartResponse;
+import org.junit.*;
+import org.junit.runners.MethodSorters;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
 
-import static io.restassured.RestAssured.given;
-
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class CreatePokemonTest {
+    Requests requests = new Requests();
+    private static Integer pokemonId;
+    private static final String nameOne = "TestNameOne";
+    private static final String nameTwo = "TestNameTwo";
 
-    @Before
-    public void killAllPokemons() {
-        Specifications.setSpecs(Specifications.requestSpec());
-
-        List<String> alivePokemons = given()    // получить список живых покемонов
-                .when()
-                .get("/v2/me")
-                .then().log().body()
-                .statusCode(200)
-                .extract().body().jsonPath().getList("data[0].pokemons_alive");
-
-        if (alivePokemons.size() != 0)      // убить всех покемонов
-            for (String alivePokemon : alivePokemons) {
-                given()
-                        .body(new HashMap<>(Collections.singletonMap("pokemon_id", alivePokemon)))
-                        .when()
-                        .post("v2/pokemons/knockout")
-                        .then().log().body()
-                        .statusCode(200);
-            }
+    @BeforeClass
+    public static void killAllPokemons() {
+        BeforeCreatePokemon before = new BeforeCreatePokemon();
+        before.setSpecsAndKillAllAlivePokemons();
     }
 
     @Test
-    public void TestPokemonCreateUpdatePutInPokeball() {
-
-        StandartResponse createResponse = given()    //создание покемона
-                .body(new CreatePokemon("AceMaker", 666))
-                .when()
-                .post("/v2/pokemons")
-                .then().log().body()
-                .statusCode(201)
-                .extract().as(StandartResponse.class);
-
-        Assert.assertEquals("Покемон создан", createResponse.getMessage());
-        String id = createResponse.getId();
-
-        PokemonData createdPokemon = getPokemon(Integer.parseInt(id))  ; //получение созданного покемона
-
-        Assert.assertEquals("AceMaker", createdPokemon.getName()); //проверка имени
-
-        StandartResponse updateResponse = given()    //смена имени покемона
-                .body(new UpdatePokemon(
-                        createdPokemon.getId(),
-                        "DoubleFault",
-                        createdPokemon.getPhoto_id()
-                ))
-                .when()
-                .put("/v2/pokemons")
-                .then().log().body()
-                .statusCode(200)
-                .extract().as(StandartResponse.class);
-
-        Assert.assertEquals("Информация о покемоне обновлена", updateResponse.getMessage());
-
-        PokemonData updatedPokemon = getPokemon(Integer.parseInt(id));  //получение обновлённого покемона
-
-        Assert.assertEquals("DoubleFault", updatedPokemon.getName()); //проверка имени
-
-        StandartResponse addPokemonInPokeball = given()  //поймать покемона в покеболл
-                .body(new HashMap<>(Collections.singletonMap("pokemon_id", updatedPokemon.getId())))
-                .when()
-                .post("/v2/trainers/add_pokeball")
-                .then().log().body()
-                .statusCode(200)
-                .extract().as(StandartResponse.class);
-
-        Assert.assertEquals("Покемон пойман в покебол", addPokemonInPokeball.getMessage());
+    public void test1CreatePokemon() {
+        StandartResponse createResponse = requests.createPokemon(nameOne, 666);    //создание покемона
+        pokemonId = Integer.parseInt(createResponse.getId()); //получение id созданного покемона
+        PokemonData createdPokemon = requests.getPokemon(pokemonId); //получение созданного покемона
+        assertThat(createResponse.getMessage(), equalTo("Покемон создан"));
+        assertThat(createdPokemon.getName(), equalTo(nameOne));  //проверка имени
     }
 
-    private static PokemonData getPokemon(Integer id) {
-        return given()
-                .queryParam("pokemon_id", id)
-                .when()
-                .get("/v2/pokemons")
-                .then().log().body()
-                .statusCode(200)
-                .extract().body().jsonPath().getObject("data[0]", PokemonData.class);
+    @Test
+    public void test2UpdatePokemon() {
+        PokemonData createdPokemon = requests.getPokemon(pokemonId);
+        StandartResponse updateResponse = requests.updatePokemon(createdPokemon.getId(), //смена имени покемона
+                nameTwo, createdPokemon.getPhoto_id());
+        PokemonData updatedPokemon = requests.getPokemon(pokemonId);  //получение обновлённого покемона
+        assertThat(updateResponse.getMessage(), equalTo("Информация о покемоне обновлена"));
+        assertThat(updatedPokemon.getName(), equalTo(nameTwo)); //проверка имени
+    }
+
+    @Test
+    public void test3AddPokeball() {
+        PokemonData pokemon = requests.getPokemon(pokemonId); //поймать покемона в покеболл
+        StandartResponse addedPokemon = requests.addPokemonInPokeball(pokemon.getId());
+        assertThat(addedPokemon.getMessage(), equalTo("Покемон пойман в покебол"));
     }
 }

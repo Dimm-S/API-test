@@ -1,25 +1,24 @@
 package org.example;
 
-import org.junit.Assert;
+import org.example.models.TrainerData;
 import org.junit.Test;
 
-import static io.restassured.RestAssured.given;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
 
 public class TrainerTest {
+    private final String trainerId = System.getenv("TRAINER_ID");
+    private final String trainerName = System.getenv("TRAINER_NAME");
+
+    Requests requests = new Requests();
 
     @Test
-    public void checkResponceCodeTest() {
+    public void testCheckResponceCode() {
         Specifications.setSpecs(Specifications.requestSpec());
-        TrainerData trainer = given()
-                .queryParam("trainer_id", "11299")
-                .when()
-                .get("/v2/trainers")
-                .then().log().all()
-                .statusCode(200)
-                .extract().body().jsonPath().getObject("data[0]", TrainerData.class);
+        TrainerData trainer = requests.getTrainer(trainerId);
 
-        Assert.assertEquals("11299", trainer.getId());
-        Assert.assertEquals("Skating Bulb", trainer.getTrainer_name());
+        assertThat(trainer.getId(), equalTo(trainerId));
+        assertThat(trainer.getTrainer_name(), equalTo(trainerName));
     }
 }
 
